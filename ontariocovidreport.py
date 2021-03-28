@@ -5,15 +5,8 @@ from datetime import date
 import json
 import urllib.request as ur
 import urllib.parse as prs
-import pyperclip
 from datetime import datetime, timedelta
 startTime = datetime.now()
-
-# Replace Spaces Function
-
-def replacespace (item):
-	item = item.replace(' ', '%20')
-	return (item)
 
 # Define Query Parameters
 
@@ -98,7 +91,6 @@ def getcoviddata(dataset,fetchdate):
 				recnum = recnum.replace(',', '')
 			# Add result to global dataset
 			coviddataset[recname].append(recnum)
-			clipboardresult = clipboardresult + str(recnum) + "	"
 
 ## Define some dates!
 getdate = date.today()
@@ -139,9 +131,6 @@ if resultstotal == datasetnum:
 	vaccinepercent = int(coviddataset['total doses administered'][0]) / 2 / ontariopop
 	vaccinerate = (int(coviddataset['total doses administered'][0]) / int(coviddataset['total doses administered'][1])) - 1
 	print ('Percentage vaccinated:',format(vaccinepercent,".1%"),'(Change of',format(vaccinerate,".1%")+')')
-	# Paste results to clipboard
-	forclipboard = (getdate.strftime("%m/%d") + "	" + clipboardresult)
-	pyperclip.copy(forclipboard)
 
 else:
 	print ('Incomplete data for today!')

@@ -3,20 +3,15 @@ from datetime import date
 import json
 import urllib.request as ur
 import urllib.parse as prs
-import pyperclip
+import pyperclip #Note - you'll need to install this module as a separate package on your local machine or this will fail. 
 from datetime import datetime, timedelta
-startTime = datetime.now()
 
-# Replace Spaces Function
-
-def replacespace (item):
-	item = item.replace(' ', '%20')
-	return (item)
+scriptstart = datetime.now()
 
 # Define Query Parameters
 
 ## URL Query Variables - Universal
-
+### These are the variables we will use to build our query.
 urlstart = 'https://data.ontario.ca/api/3/action/datastore_search?'	
 today = str(date.today())+'T00:00:00'
 urlfilter = ''
@@ -25,33 +20,38 @@ resourceid = ''
 friendlyname = '' 
 
 ## URL Query Variables - Per Dataset
+### Each Ontario dataset has a unique resource ID that we use to identify it when querying.
 resourceidlist = {
 	'Vaccinedata': '8a89caa9-511c-4568-af89-7f2174b4378c',
 	'Casedata': 'ed270bb8-340b-41f9-a7c6-e8ef587e6d11'
 	}
+### For some reason, each Ontario dataset seems to have a different field name for reported data. This specifies the correct date field name per dataset so we can query by date. 
 datefieldlist = {
 	'Vaccinedata': 'report_date',
 	'Casedata': 'Reported Date'
 	}
+### This variable stores all of the fields we want to retrieve from each Ontario dataset. The script will get and print all of today's data for each field listed here.
 fieldlist = {
 	'Vaccinedata': ['total_doses_administered', 'total_individuals_fully_vaccinated'],
 	'Casedata': ['Total Cases', 'Number of patients hospitalized with COVID-19']
 	}
+## This specifies what we want to call each dataset when we output its results. 
 friendlynamelist = {
 	'Vaccinedata': 'Vaccine Data',
 	'Casedata': 'Case Data'
 	}
 
+
+## Create a dictionary variable that will store the all the data that we retrieve
+coviddataset = {}
+## This little loop takes all of the fields we listed in 'field list' and adds them to the coviddataset dictionary variable as keys. We'l use this later to parse through and add values to.
+for x in fieldlist:
+	for i in fieldlist[x]:
+		i = i.replace('_',' ')
+		coviddataset[i] = []
+
+## Creates the clipboard result variable where we'll later add to for copying to the local clipboard. This is to help pasting the data onto a spreadsheet. 
 clipboardresult = ''
-
-## Variable to store all results so we can compare them 
-
-coviddataset = {
-  'Total Cases': [],
-  'Number of patients hospitalized with COVID-19': [],
-  'total doses administered': [],
-  'total individuals fully vaccinated': [],
-}
 
 resultstotal = 0
 
@@ -120,7 +120,7 @@ if resultstotal == datasetnum:
 	# Show today's numbers 
 	print ('## Today\'s Data')
 	for i in coviddataset:
-		print (i.title(),':',format(int(coviddataset[i][0]),","))
+		print ('-',i.title(),':',format(int(coviddataset[i][0]),","))
 		clipboardresult = clipboardresult + str(int(coviddataset[i][0])) + '	'
 	clipboardresult = clipboardresult.rstrip()
 	print ('')
@@ -129,23 +129,35 @@ if resultstotal == datasetnum:
 	newcasestoday = coviddataset['Total Cases'][0] - coviddataset['Total Cases'][1] 
 	newcasesyesterday = coviddataset['Total Cases'][1] - coviddataset['Total Cases'][2]
 	newcaseratechange = (newcasestoday / newcasesyesterday) - 1
-	print ('New Cases:',newcasestoday, '(Change of', format(newcaseratechange,".1%")+')') 
+	print ('- New Cases:',newcasestoday, '*(Change of', format(newcaseratechange,".1%")+')*') 
 	# Calculate hospitalization changes 
 	hospitalchange = coviddataset['Number of patients hospitalized with COVID-19'][0] - coviddataset['Number of patients hospitalized with COVID-19'][1]
 	hospitalratechange = (coviddataset['Number of patients hospitalized with COVID-19'][0] / coviddataset['Number of patients hospitalized with COVID-19'][1])-1
-	print ('Hospitalization Change:',hospitalchange,'(Change of',format(hospitalratechange,".1%")+')')
+	print ('- Hospitalization Change:',hospitalchange,'*(Change of',format(hospitalratechange,".1%")+')*')
 	# Calculate hospitalization rates
 	ontariopop = 14570000
 	vaccinepercent = (int(coviddataset['total doses administered'][0]) - int(coviddataset['total individuals fully vaccinated'][0])) / ontariopop
 	vaccinerate = (int(coviddataset['total doses administered'][0]) / int(coviddataset['total doses administered'][1])) - 1
-	print ('% of People With at Least One Dose:',format(vaccinepercent,".1%"),'(Change of',format(vaccinerate,".1%")+')')
+	print ('- % of People With at Least One Dose:',format(vaccinepercent,".1%"),'*(Change of',format(vaccinerate,".1%")+')*')
 	# Paste results to clipboard
 	forclipboard = (getdate.strftime("%m/%d") + "	" + clipboardresult)
 	pyperclip.copy(forclipboard)
 else:
-	print ('Incomplete data for today!')
-
+	print ('Incomplete data for today!\n')
+	coviddataset = {
+	  'Total Cases': [],
+	  'Number of patients hospitalized with COVID-19': [],
+	  'total doses administered': [],
+	  'total individuals fully vaccinated': [],
+	}
+	getcoviddata ('Casedata',str(getdate))
+	getcoviddata ('Vaccinedata',str(getdate))
+	for i in coviddataset:
+		print (i,":",coviddataset[i])
 print ('')
 
 ## Show script runtime - uncomment for troubleshooting 
-# print(datetime.now() - startTime)
+# scriptend = datetime.now()
+# scriptruntime = scriptend - scriptstart
+# timeformat = scriptruntime.strftime("%H:%M:%S")
+# print (timeformat)

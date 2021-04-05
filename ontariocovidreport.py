@@ -5,6 +5,7 @@ import urllib.request as ur
 import urllib.parse as prs
 import pyperclip #Note - you'll need to install this module as a separate package on your local machine or this will fail. 
 from datetime import datetime, timedelta
+import sys
 
 scriptstart = datetime.now()
 
@@ -78,7 +79,7 @@ def getcoviddata(dataset,fetchdate):
 	fieldQuery = fieldQuery.replace('\'', '\"')
 	# Make url
 	queryurl = urlstart + 'resource_id=' + resourceid + '&fields=' + fieldQuery + '&filters={' + urlfilter + '}'
-	#print ('** ' + friendlynamelist[dataset] + ' Report **')
+	#print ('** ' + friendlynamelist[dataset] + ' Report *')
 	#print ('query url was ' + queryurl) # Uncomment for troubleshooting
 	url = queryurl
 	fileobj = ur.urlopen(url)
@@ -98,8 +99,21 @@ def getcoviddata(dataset,fetchdate):
 			coviddataset[recname].append(recnum)
 
 ## Define some dates!
-getdate = date.today()
+reporteddate = ''
+
+if len(sys.argv) == 1:
+	askeddate = 'today'
+else:
+	askeddate = sys.argv[1]
+
+if askeddate == 'yesterday':
+	getdate = date.today() - timedelta(days=1)
+	reporteddate = '**Yesterday\'s Data**',getdate
+else:
+	getdate = date.today()
+	
 reportingdate = getdate.strftime("%B %d, %Y") # This is used to display the date the report was run
+
 
 ## Kick off intro / heading 
 # print ('')
@@ -107,15 +121,16 @@ reportingdate = getdate.strftime("%B %d, %Y") # This is used to display the date
 # print ('')
 
 # Get all the data
-daysback = 0 # sets how many days back from today to get data 
+daysget = 0 # sets how many days of data to get (starting from today)
 datasetnum = 0
-while daysback < 3:
-	getcoviddata ('Vaccinedata',str(getdate - timedelta(days=daysback)))
+while daysget < 9:
+	getcoviddata ('Vaccinedata',str(getdate - timedelta(days=daysget)))
 	datasetnum = datasetnum + 1
-	getcoviddata ('Casedata',str(getdate - timedelta(days=daysback)))
+	getcoviddata ('Casedata',str(getdate - timedelta(days=daysget)))
 	datasetnum = datasetnum + 1
-	daysback = daysback + 1
+	daysget = daysget + 1
 
+## This part of the script takes the data, does some calculations, and returns the results.
 if resultstotal == datasetnum:
 	# Show today's numbers 
 	print ('## Today\'s Data')
@@ -125,20 +140,62 @@ if resultstotal == datasetnum:
 	clipboardresult = clipboardresult.rstrip()
 	print ('')
 	print ('## Today\'s Trends')
-	# Show new case data
+
+	# Calculate and display new cases
 	newcasestoday = coviddataset['Total Cases'][0] - coviddataset['Total Cases'][1] 
 	newcasesyesterday = coviddataset['Total Cases'][1] - coviddataset['Total Cases'][2]
 	newcaseratechange = (newcasestoday / newcasesyesterday) - 1
-	print ('- New Cases:',newcasestoday, '*(Change of', format(newcaseratechange,".1%")+')*') 
-	# Calculate hospitalization changes 
+	if newcaseratechange < 0:
+		arrow = '⬇️'
+		newcaseratechange = newcaseratechange * -1
+	else:
+		arrow = '⬆️'
+	print ('- 🦠 New Cases:<span style="color:red">',newcasestoday, '</span>('+arrow,format(newcaseratechange,".1%")+')') 
+	
+	# Calculate and display 7 day average 
+	def sevavcalc(startday):
+		if startday == 'today':
+			x = 0
+			y = 7
+		else: 
+			x = 1
+			y = 8
+		sevendaynewcases = [] 
+		while x < y:
+			sevendaynewcases.append(coviddataset['Total Cases'][x] - coviddataset['Total Cases'][x+1])
+			x += 1
+		return (sum(sevendaynewcases) / 7)
+
+	sevdayratechange = sevavcalc('today') / sevavcalc('yesterday') -1
+	if sevdayratechange > 0:
+		arrow = '⬆️'
+	else: 
+		arrow = '⬇️' 
+	print ('\t- 7 Day Avearage New Case count:',round(sevavcalc('today')),'(',arrow,format(sevdayratechange,".1%"),')')
+	
+	# Calculate and display hospitalization changes 
 	hospitalchange = coviddataset['Number of patients hospitalized with COVID-19'][0] - coviddataset['Number of patients hospitalized with COVID-19'][1]
 	hospitalratechange = (coviddataset['Number of patients hospitalized with COVID-19'][0] / coviddataset['Number of patients hospitalized with COVID-19'][1])-1
-	print ('- Hospitalization Change:',hospitalchange,'*(Change of',format(hospitalratechange,".1%")+')*')
-	# Calculate hospitalization rates
+	if hospitalratechange < 0:
+		arrow = '⬇️'
+		hospitalratechange = hospitalratechange * -1
+		color = 'green'
+	else:
+		arrow = '⬆️'
+		color = 'red'
+	print ('- 🏥 Hospitalization Change:','<span style="color:'+color+'\">',hospitalchange,'</span>','('+arrow,format(hospitalratechange,".1%")+')')
+
+	# Calculate and display vaccination rates
 	ontariopop = 14570000
 	vaccinepercent = (int(coviddataset['total doses administered'][0]) - int(coviddataset['total individuals fully vaccinated'][0])) / ontariopop
 	vaccinerate = (int(coviddataset['total doses administered'][0]) / int(coviddataset['total doses administered'][1])) - 1
-	print ('- % of People With at Least One Dose:',format(vaccinepercent,".1%"),'*(Change of',format(vaccinerate,".1%")+')*')
+	if vaccinerate < 0:
+		arrow = '⬇️'
+		vaccinerate = vaccinerate * -1
+	else:
+		arrow = '⬆️'
+	print ('- % of People With at Least One 💉  Dose:','<span style="color:green">',format(vaccinepercent,".1%"),'</span>('+arrow,format(vaccinerate,".1%")+')')
+	
 	# Paste results to clipboard
 	forclipboard = (getdate.strftime("%m/%d") + "	" + clipboardresult)
 	pyperclip.copy(forclipboard)
@@ -153,8 +210,9 @@ else:
 	getcoviddata ('Casedata',str(getdate))
 	getcoviddata ('Vaccinedata',str(getdate))
 	for i in coviddataset:
-		print (i,":",coviddataset[i])
-print ('')
+		print ('- ',i,":",coviddataset[i])
+
+print (reporteddate)
 
 ## Show script runtime - uncomment for troubleshooting 
 # scriptend = datetime.now()

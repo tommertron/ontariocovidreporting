@@ -34,14 +34,13 @@ datefieldlist = {
 ### This variable stores all of the fields we want to retrieve from each Ontario dataset. The script will get and print all of today's data for each field listed here.
 fieldlist = {
 	'Vaccinedata': ['total_doses_administered', 'total_individuals_fully_vaccinated'],
-	'Casedata': ['Total Cases', 'Number of patients hospitalized with COVID-19']
+	'Casedata': ['Total Cases', 'Number of patients hospitalized with COVID-19','Number of patients in ICU due to COVID-19']
 	}
 ## This specifies what we want to call each dataset when we output its results. 
 friendlynamelist = {
 	'Vaccinedata': 'Vaccine Data',
 	'Casedata': 'Case Data'
 	}
-
 
 ## Create a dictionary variable that will store the all the data that we retrieve
 coviddataset = {}
@@ -78,9 +77,9 @@ def getcoviddata(dataset,fetchdate):
 	fieldQuery = fieldQuery.replace(' ', '%20')
 	fieldQuery = fieldQuery.replace('\'', '\"')
 	# Make url
+	#print (urlstart + 'resource_id=' + resourceid + '&fields=' + fieldQuery + '&filters={' + urlfilter + '}')
 	queryurl = urlstart + 'resource_id=' + resourceid + '&fields=' + fieldQuery + '&filters={' + urlfilter + '}'
 	#print ('** ' + friendlynamelist[dataset] + ' Report *')
-	#print ('query url was ' + queryurl) # Uncomment for troubleshooting
 	url = queryurl
 	fileobj = ur.urlopen(url)
 	## Format Data Into Json
@@ -133,15 +132,12 @@ while daysget < 9:
 ## This part of the script takes the data, does some calculations, and returns the results.
 if resultstotal == datasetnum:
 	# Show today's numbers 
-	print ('## Today\'s Data')
 	for i in coviddataset:
-		print ('-',i.title(),':',format(int(coviddataset[i][0]),","))
+		# print ('-',i.title(),':',format(int(coviddataset[i][0]),","))
 		clipboardresult = clipboardresult + str(int(coviddataset[i][0])) + '	'
 	clipboardresult = clipboardresult.rstrip()
-	print ('')
-	print ('## Today\'s Trends')
-
 	# Calculate and display new cases
+	print ('## 🦠 Case Data')
 	newcasestoday = coviddataset['Total Cases'][0] - coviddataset['Total Cases'][1] 
 	newcasesyesterday = coviddataset['Total Cases'][1] - coviddataset['Total Cases'][2]
 	newcaseratechange = (newcasestoday / newcasesyesterday) - 1
@@ -150,8 +146,7 @@ if resultstotal == datasetnum:
 		newcaseratechange = newcaseratechange * -1
 	else:
 		arrow = '⬆️'
-	print ('- 🦠 New Cases:<span style="color:red">',newcasestoday, '</span>('+arrow,format(newcaseratechange,".1%")+')') 
-	
+	print ('- New Cases:',str(newcasestoday), '('+arrow,format(newcaseratechange,".1%")+')') 
 	# Calculate and display 7 day average 
 	def sevavcalc(startday):
 		if startday == 'today':
@@ -165,37 +160,50 @@ if resultstotal == datasetnum:
 			sevendaynewcases.append(coviddataset['Total Cases'][x] - coviddataset['Total Cases'][x+1])
 			x += 1
 		return (sum(sevendaynewcases) / 7)
-
 	sevdayratechange = sevavcalc('today') / sevavcalc('yesterday') -1
 	if sevdayratechange > 0:
 		arrow = '⬆️'
 	else: 
 		arrow = '⬇️' 
-	print ('\t- 7 Day Avearage New Case count:',round(sevavcalc('today')),'(',arrow,format(sevdayratechange,".1%"),')')
-	
-	# Calculate and display hospitalization changes 
-	hospitalchange = coviddataset['Number of patients hospitalized with COVID-19'][0] - coviddataset['Number of patients hospitalized with COVID-19'][1]
-	hospitalratechange = (coviddataset['Number of patients hospitalized with COVID-19'][0] / coviddataset['Number of patients hospitalized with COVID-19'][1])-1
-	if hospitalratechange < 0:
-		arrow = '⬇️'
-		hospitalratechange = hospitalratechange * -1
-		color = 'green'
-	else:
-		arrow = '⬆️'
-		color = 'red'
-	print ('- 🏥 Hospitalization Change:','<span style="color:'+color+'\">',hospitalchange,'</span>','('+arrow,format(hospitalratechange,".1%")+')')
-
+	print ('- 7 Day Average New Case count:',round(sevavcalc('today')),'('+arrow,format(sevdayratechange,".1%")+')')
+	# 🏥 Hospitalization Data
+	print ('## 🏥 Hospitalization Data')
+	def ratechange (datum):
+		change = coviddataset[datum][0] - coviddataset[datum][1]
+		ratechange = (coviddataset[datum][0] / coviddataset[datum][1])-1
+		if ratechange < 0:
+			arrow = '⬇️'
+			ratechange = ratechange * -1
+			color = 'green'
+		else:
+			arrow = '⬆️'
+			color = 'red'
+		return ('<span style="color:'+color+'\">'+str(change)+'</span>'+' ('+arrow+" "+str(format(ratechange,".1%"))+')')
+	print ('- Number of patients in hospital:',coviddataset['Number of patients hospitalized with COVID-19'][0])
+	print ('- Hospitalization Change:',str(ratechange('Number of patients hospitalized with COVID-19')))
+	print ('- Number of patients in ICU:',coviddataset['Number of patients in ICU due to COVID-19'][0])
+	print ('- ICU Change:',str(ratechange('Number of patients in ICU due to COVID-19')))
 	# Calculate and display vaccination rates
-	ontariopop = 14570000
-	vaccinepercent = (int(coviddataset['total doses administered'][0]) - int(coviddataset['total individuals fully vaccinated'][0])) / ontariopop
-	vaccinerate = (int(coviddataset['total doses administered'][0]) / int(coviddataset['total doses administered'][1])) - 1
+	print ('## 💉 Vaccination Data')
+	ontariopop = 14711800
+	def vaxchange (datum):
+		vaccinepercent = (int(coviddataset[datum][0]) - int(coviddataset['total individuals fully vaccinated'][0])) / ontariopop
+		vaccinerate = (int(coviddataset[datum][0]) / int(coviddataset[datum][1])) - 1
+		if vaccinerate < 0:
+			arrow = '⬇️'
+			vaccinerate = vaccinerate * -1
+		else:
+			arrow = '⬆️'
+		return (str(format(vaccinepercent,".1%"))+' ('+arrow+" "+str(format(vaccinerate,".1%"))+')')
+	print ('- % of People With at Least One Dose:',vaxchange('total doses administered'))
+	vaccinepercent = (int(coviddataset['total individuals fully vaccinated'][0])) / ontariopop
+	vaccinerate = (int(coviddataset['total individuals fully vaccinated'][0]) / int(coviddataset['total individuals fully vaccinated'][1])) - 1
 	if vaccinerate < 0:
 		arrow = '⬇️'
 		vaccinerate = vaccinerate * -1
 	else:
 		arrow = '⬆️'
-	print ('- % of People With at Least One 💉  Dose:','<span style="color:green">',format(vaccinepercent,".1%"),'</span>('+arrow,format(vaccinerate,".1%")+')')
-	
+	print ('- % of People Fully Vaccinated:',format(vaccinepercent,".1%"),'('+arrow,format(vaccinerate,".2%")+')')
 	# Paste results to clipboard
 	forclipboard = (getdate.strftime("%m/%d") + "	" + clipboardresult)
 	pyperclip.copy(forclipboard)

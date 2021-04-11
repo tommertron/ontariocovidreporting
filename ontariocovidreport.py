@@ -55,14 +55,22 @@ clipboardresult = ''
 
 resultstotal = 0
 
-emailbody = ""
 
-def getcoviddata(dataset,fetchdate):
+def getcoviddata(dataset,getdays,fetchdate):
 	# Get dataset specific values for the query
 	resourceid = resourceidlist[dataset]
 	friendlyname = friendlynamelist[dataset]
 	fields = fieldlist[dataset]
-	urlfilter = '\"' + datefieldlist[dataset] + '\":'+ '\"' + fetchdate + '\"'
+	urlfilter = '\"' + datefieldlist[dataset] + '\":'+ '['
+	expectedresults = getdays
+	#getdays = getdays + 1
+	while getdays > 0:
+		urlfilter = urlfilter + '\"' + str(fetchdate) + '\"'
+		fetchdate = fetchdate - timedelta(days=1)
+		getdays = getdays - 1
+		if getdays > 0:
+			urlfilter = urlfilter + ','
+	urlfilter = urlfilter+']'
 	urlfilter = urlfilter.replace(' ', '%20')
 	fieldQuery = ''
 	# Set global variables
@@ -77,7 +85,7 @@ def getcoviddata(dataset,fetchdate):
 	fieldQuery = fieldQuery.replace(' ', '%20')
 	fieldQuery = fieldQuery.replace('\'', '\"')
 	# Make url
-	#print (urlstart + 'resource_id=' + resourceid + '&fields=' + fieldQuery + '&filters={' + urlfilter + '}')
+	#print (urlstart + 'resource_id=' + resourceid + '&fields=' + fieldQuery + '&filters={' + urlfilter + '}') # This prints what the url will be. Uncomment and paste the result into a browser to troubleshoot.
 	queryurl = urlstart + 'resource_id=' + resourceid + '&fields=' + fieldQuery + '&filters={' + urlfilter + '}'
 	#print ('** ' + friendlynamelist[dataset] + ' Report *')
 	url = queryurl
@@ -88,14 +96,17 @@ def getcoviddata(dataset,fetchdate):
 	resultstotal = resultstotal + nicedata['result']['total']
 	resultscheck = nicedata['result']['total']
 	if resultscheck > 0:
-		for i in nicedata['result']['records'][0]:
-			recname = i
-			recnum = nicedata['result']['records'][0][i]
-			recname = recname.replace('_', ' ')
-			if type(recnum) == str:
-				recnum = recnum.replace(',', '')
-			# Add result to global dataset
-			coviddataset[recname].append(recnum)
+		quay = expectedresults -1
+		while quay > 0-1:
+			for i in nicedata['result']['records'][quay]:
+				recname = i
+				recnum = nicedata['result']['records'][quay][i]
+				recname = recname.replace('_', ' ')
+				if type(recnum) == str:
+					recnum = recnum.replace(',', '')
+				# Add result to global dataset
+				coviddataset[recname].append(recnum)
+			quay = quay -1
 
 ## Define some dates!
 reporteddate = ''
@@ -113,24 +124,14 @@ else:
 	
 reportingdate = getdate.strftime("%B %d, %Y") # This is used to display the date the report was run
 
-
-## Kick off intro / heading 
-# print ('')
-# print ('Tom\'s Ontario Covid Report for ' + reportingdate)
-# print ('')
-
 # Get all the data
-daysget = 0 # sets how many days of data to get (starting from today)
-datasetnum = 0
-while daysget < 9:
-	getcoviddata ('Vaccinedata',str(getdate - timedelta(days=daysget)))
-	datasetnum = datasetnum + 1
-	getcoviddata ('Casedata',str(getdate - timedelta(days=daysget)))
-	datasetnum = datasetnum + 1
-	daysget = daysget + 1
+daysget = 9 # sets how many days of data to get (starting from today)
+
+getcoviddata ('Vaccinedata',daysget,getdate)
+getcoviddata ('Casedata',daysget,getdate)
 
 ## This part of the script takes the data, does some calculations, and returns the results.
-if resultstotal == datasetnum:
+if resultstotal == daysget *2:
 	# Show today's numbers 
 	for i in coviddataset:
 		# print ('-',i.title(),':',format(int(coviddataset[i][0]),","))
@@ -146,7 +147,7 @@ if resultstotal == datasetnum:
 		newcaseratechange = newcaseratechange * -1
 	else:
 		arrow = '⬆️'
-	print ('- New Cases:',str(newcasestoday), '('+arrow,format(newcaseratechange,".1%")+')') 
+	print ('- New Cases:',str(round(newcasestoday)), '('+arrow,format(newcaseratechange,".1%")+')') 
 	# Calculate and display 7 day average 
 	def sevavcalc(startday):
 		if startday == 'today':
@@ -169,7 +170,7 @@ if resultstotal == datasetnum:
 	# 🏥 Hospitalization Data
 	print ('## 🏥 Hospitalization Data')
 	def ratechange (datum):
-		change = coviddataset[datum][0] - coviddataset[datum][1]
+		change = round(coviddataset[datum][0] - coviddataset[datum][1])
 		ratechange = (coviddataset[datum][0] / coviddataset[datum][1])-1
 		if ratechange < 0:
 			arrow = '⬇️'
@@ -215,15 +216,14 @@ else:
 	  'total doses administered': [],
 	  'total individuals fully vaccinated': [],
 	}
-	getcoviddata ('Casedata',str(getdate))
-	getcoviddata ('Vaccinedata',str(getdate))
+	getcoviddata ('Vaccinedata',daysget,getdate)
+	getcoviddata ('Casedata',daysget,getdate)
 	for i in coviddataset:
 		print ('- ',i,":",coviddataset[i])
 
-print (reporteddate)
+# This prints the reported date if yesterday was asked for.
+if reporteddate != '':
+	print (reporteddate)
 
-## Show script runtime - uncomment for troubleshooting 
-# scriptend = datetime.now()
-# scriptruntime = scriptend - scriptstart
-# timeformat = scriptruntime.strftime("%H:%M:%S")
-# print (timeformat)
+# Show script runtime - uncomment for troubleshooting 
+# print (datetime.now() - scriptstart)

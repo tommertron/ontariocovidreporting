@@ -13,7 +13,7 @@ scriptstart = datetime.now()
 
 ## URL Query Variables - Universal
 ### These are the variables we will use to build our query.
-urlstart = 'https://data.ontario.ca/api/3/action/datastore_search?'	
+urlstart = 'https://data.ontario.ca/api/3/action/datastore_search?'
 today = str(date.today())+'T00:00:00'
 urlfilter = ''
 fieldQuery = ''
@@ -45,8 +45,8 @@ friendlynamelist = {
 ## Create a dictionary variable that will store the all the data that we retrieve
 coviddataset = {}
 ## This little loop takes all of the fields we listed in 'field list' and adds them to the coviddataset dictionary variable as keys. We'l use this later to parse through and add values to.
-for x in fieldlist:
-	for i in fieldlist[x]:
+for x, value in fieldlist.items():
+	for i in value:
 		i = i.replace('_',' ')
 		coviddataset[i] = []
 
@@ -111,17 +111,13 @@ def getcoviddata(dataset,getdays,fetchdate):
 ## Define some dates!
 reporteddate = ''
 
-if len(sys.argv) == 1:
-	askeddate = 'today'
-else:
-	askeddate = sys.argv[1]
-
+askeddate = 'today' if len(sys.argv) == 1 else sys.argv[1]
 if askeddate == 'yesterday':
 	getdate = date.today() - timedelta(days=1)
 	reporteddate = '**Yesterday\'s Data**',getdate
 else:
 	getdate = date.today()
-	
+
 reportingdate = getdate.strftime("%B %d, %Y") # This is used to display the date the report was run
 
 # Get all the data
